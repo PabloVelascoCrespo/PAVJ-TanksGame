@@ -11,6 +11,9 @@ class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
 struct FInputActionValue;
+class UUserWidget;
+class UCameraShakeBase;
+class AProjectile;
 
 UCLASS()
 class TANKSGAME_API ATank : public APawn
@@ -31,6 +34,8 @@ protected:
   virtual void BeginPlay() override;
 
 private:
+
+  APlayerController* m_pPC;
   // COMPONENTS
 
   UPROPERTY(VisibleAnywhere, meta = (DisplayName = "Tank Body"))
@@ -41,7 +46,7 @@ private:
 
   UPROPERTY(VisibleAnywhere, meta = (DisplayName = "Tank Cannon"))
   UStaticMeshComponent* m_pTankCannon;
-  
+
   UPROPERTY(VisibleAnywhere, meta = (DisplayName = "Spring Arm"))
   USpringArmComponent* m_pSpringArm;
 
@@ -60,7 +65,7 @@ private:
 
   UPROPERTY(EditAnywhere, Category = "Input", meta = (DisplayName = "Rotate Turret Action"))
   UInputAction* m_pRotateTurretAction;
-  
+
   UPROPERTY(EditAnywhere, Category = "Input", meta = (DisplayName = "Look Up Action"))
   UInputAction* m_pLookUpAction;
 
@@ -74,23 +79,50 @@ private:
   UPROPERTY(EditAnywhere, Category = "Movement", meta = (DisplayName = "Turn Speed"))
   float m_fTurnSpeed = 30.0f;
 
-  UPROPERTY(EditAnywhere, Category = "Movement", meta = (DisplayName = "Turn View Speed"))
+  UPROPERTY(EditAnywhere, Category = "Camera", meta = (DisplayName = "Turn View Speed"))
   float m_fTurnViewSpeed = 50.0f;
 
-  UPROPERTY(EditAnywhere, Category = "Movement", meta = (DisplayName = "Look Up Speed"))
+  UPROPERTY(EditAnywhere, Category = "Camera", meta = (DisplayName = "Look Up Speed"))
   float m_fLookUpSpeed = 50.0f;
 
-  UPROPERTY(EditAnywhere, Category = "Movement", meta = (DisplayName = "Min Cannon Pitch"))
+  UPROPERTY(EditAnywhere, Category = "Camera", meta = (DisplayName = "Min Cannon Pitch"))
   float m_fMinCannonPitch = -10.0f;
 
-  UPROPERTY(EditAnywhere, Category = "Movement", meta = (DisplayName = "Max Cannon Pitch"))
-  float m_fMaxCannonPitch = 0.0f;
+  UPROPERTY(EditAnywhere, Category = "Camera", meta = (DisplayName = "Max Cannon Pitch"))
+  float m_fMaxCannonPitch = 20.0f;
 
-  UPROPERTY(EditAnywhere, Category = "Movement", meta = (DisplayName = "Min Cannon Pitch"))
+  UPROPERTY(EditAnywhere, Category = "Camera", meta = (DisplayName = "Min Camera Pitch"))
   float m_fMinLookUpPitch = -50.0f;
 
-  UPROPERTY(EditAnywhere, Category = "Movement", meta = (DisplayName = "Max Cannon Pitch"))
+  UPROPERTY(EditAnywhere, Category = "Camera", meta = (DisplayName = "Max Camera Pitch"))
   float m_fMaxLookUpPitch = 0.0f;
+
+  UPROPERTY(EditAnywhere, Category = "Camera", meta = (DisplayName = "Turret Rotation Speed"))
+  float m_fTurretRotationSpeed = 15.0f;
+
+  UPROPERTY(EditAnywhere, Category = "Camera", meta = (DisplayName = "Cannon Rotation Speed"))
+  float m_fCannonPitchSpeed = 15.0f;
+
+  UPROPERTY(EditAnywhere, Category = "Combat", meta = (DisplayName = "Fire Rate"))
+  float m_fFireRate = 0.7f;
+
+  float LastFireTime = -INFINITY;
+
+  UPROPERTY(EditAnywhere, Category = "Combat")
+  TSubclassOf<AProjectile> ProjectileClass;
+
+  UPROPERTY(EditAnywhere, Category = "Combat")
+  float MuzzleOffset = 540.0f;
+
+  UPROPERTY(EditAnywhere, Category = "Combat")
+  TSubclassOf<UCameraShakeBase> FireCameraShake;
+
+  UPROPERTY(EditDefaultsOnly, Category = "UI")
+  TSubclassOf<UUserWidget> CrosshairWidgetClass;
+
+  UPROPERTY(EditDefaultsOnly, Category = "UI")
+  TSubclassOf<UUserWidget> CannonIndicatorWidgetClass;
+  UUserWidget* CannonIndicatorWidget;
 
   void MoveForward(const FInputActionValue& Value);
   void Turn(const FInputActionValue& Value);
@@ -99,5 +131,6 @@ private:
   void Fire(const FInputActionValue& Value);
 
   void RotateTurret();
-  void RotateCannon();
+  void AimCannonToCursor();
+  void UpdateCannonIndicatorWidgetPosition();
 };
