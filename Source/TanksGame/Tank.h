@@ -76,8 +76,19 @@ private:
   UPROPERTY(EditAnywhere, Category = "Movement", meta = (DisplayName = "Move Speed"))
   float m_fMoveSpeed = 300.0f;
 
+  UPROPERTY(EditAnywhere, Category = "Movement", meta = (DisplayName = "Max Move Speed"))
+  float m_fMaxMoveSpeed = 300.0f;
+
+  UPROPERTY(EditAnywhere, Category = "Movement", meta = (DisplayName = "Acceleration Rate"))
+  float m_fAccelerationRate = 4.0f;
+
+  UPROPERTY(EditAnywhere, Category = "Movement", meta = (DisplayName = "Deceleration Rate"))
+  float m_fDecelerationRateRate = 5.0f;
+
   UPROPERTY(EditAnywhere, Category = "Movement", meta = (DisplayName = "Turn Speed"))
   float m_fTurnSpeed = 30.0f;
+
+  float MoveInputValue;
 
   UPROPERTY(EditAnywhere, Category = "Camera", meta = (DisplayName = "Turn View Speed"))
   float m_fTurnViewSpeed = 50.0f;
@@ -125,6 +136,8 @@ private:
   UUserWidget* CannonIndicatorWidget;
 
   void MoveForward(const FInputActionValue& Value);
+  void ForwardMovement(float DeltaTime);
+
   void Turn(const FInputActionValue& Value);
   void TurnView(const FInputActionValue& Value);
   void LookUp(const FInputActionValue& Value);
@@ -133,4 +146,40 @@ private:
   void RotateTurret();
   void AimCannonToCursor();
   void UpdateCannonIndicatorWidgetPosition();
+
+
+  // === Multiplayer ===
+  virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+  UFUNCTION(Server, Reliable)
+  void Server_MoveForward(float Value);
+
+  UFUNCTION(Server, Reliable)
+  void Server_Turn(float Value);
+
+  UFUNCTION(Server, Reliable)
+  void Server_UpdateTurretRotation(FRotator NewRotation);
+
+  UFUNCTION(Server, Reliable)
+  void Server_UpdateCannonPitch(float NewPitch);
+
+  UFUNCTION(Server, Reliable)
+  void Server_Fire();
+
+  // Variables Replicadas
+  UPROPERTY(Replicated)
+  float MoveInputValueReplicated;
+
+  UPROPERTY(ReplicatedUsing = OnRep_TurretRotation)
+  FRotator TurretRotationReplicated;
+
+  UPROPERTY(ReplicatedUsing = OnRep_CannonPitch)
+  float CannonPitchReplicated;
+
+  UFUNCTION()
+  void OnRep_TurretRotation();
+
+  UFUNCTION()
+  void OnRep_CannonPitch();
+
 };

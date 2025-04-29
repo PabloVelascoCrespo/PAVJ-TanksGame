@@ -7,6 +7,8 @@
 #include "Kismet/KismetMathLibrary.h"
 #include "Blueprint/UserWidget.h"
 #include "Projectile.h"
+#include "Net/UnrealNetwork.h"
+
 ATank::ATank()
 {
   // Set this pawn to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
@@ -29,15 +31,21 @@ ATank::ATank()
   m_pCamera->SetupAttachment(m_pSpringArm);
   m_pCamera->bUsePawnControlRotation = false;
 
+  bReplicates = true;
+  SetReplicateMovement(true);
 }
 
 void ATank::Tick(float DeltaTime)
 {
   Super::Tick(DeltaTime);
 
-  RotateTurret();
-  AimCannonToCursor();
+  if(IsLocallyControlled())
+  {
+    RotateTurret();
+    AimCannonToCursor();
+  }
   UpdateCannonIndicatorWidgetPosition();
+  ForwardMovement(DeltaTime);
 
   /*********************TEST**********************/
   FString RoleString;
@@ -67,6 +75,7 @@ void ATank::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
   if (UEnhancedInputComponent* Input = Cast<UEnhancedInputComponent>(PlayerInputComponent))
   {
     Input->BindAction(m_pMoveForwardAction, ETriggerEvent::Triggered, this, &ATank::MoveForward);
+    Input->BindAction(m_pMoveForwardAction, ETriggerEvent::Completed, this, &ATank::MoveForward);
     Input->BindAction(m_pLookUpAction, ETriggerEvent::Triggered, this, &ATank::LookUp);
     Input->BindAction(m_pTurnAction, ETriggerEvent::Triggered, this, &ATank::Turn);
     Input->BindAction(m_pFireAction, ETriggerEvent::Triggered, this, &ATank::Fire);
@@ -110,14 +119,34 @@ void ATank::BeginPlay()
 
 void ATank::MoveForward(const FInputActionValue& Value)
 {
-  float InputValue = Value.Get<float>();
+  MoveInputValue = Value.Get<float>();
+  
+  if(!HasAuthority())
+  {
+    Server_MoveForward(MoveInputValue);
+  }
+}
 
-  if (InputComponent != 0)
+void ATank::ForwardMovement(float DeltaTime)
+{
+  float InputToUse = (IsLocallyControlled() || HasAuthority()) ? MoveInputValue : MoveInputValueReplicated;
+
+  float TargetSpeed = InputToUse * m_fMaxMoveSpeed;
+  
+  if (InputToUse != 0)
+  {
+    m_fMoveSpeed = FMath::FInterpTo(m_fMoveSpeed, TargetSpeed, DeltaTime, m_fAccelerationRate);
+  }
+  else
+  {
+    m_fMoveSpeed = FMath::FInterpTo(m_fMoveSpeed, 0.0f, DeltaTime, m_fDecelerationRateRate);
+
+  }
+
+  if (m_fMoveSpeed != 0)
   {
     FVector Forward = FVector::ForwardVector;
-    AddActorLocalOffset(Forward * InputValue * m_fMoveSpeed * GetWorld()->GetDeltaSeconds(), 0.0f);
-
-    UE_LOG(LogTemp, Warning, TEXT("Moving"));
+    AddActorLocalOffset(Forward * m_fMoveSpeed * DeltaTime, true);
   }
 }
 
@@ -125,11 +154,11 @@ void ATank::Turn(const FInputActionValue& Value)
 {
   float InputValue = Value.Get<float>();
 
-  if (InputComponent != 0)
-  {
-    AddActorLocalRotation(FRotator(0.f, InputValue * m_fTurnSpeed * GetWorld()->GetDeltaSeconds(), 0.0f));
+  AddActorLocalRotation(FRotator(0.f, InputValue * m_fTurnSpeed * GetWorld()->GetDeltaSeconds(), 0.0f));
 
-    UE_LOG(LogTemp, Warning, TEXT("Turning"));
+  if (!HasAuthority())
+  {
+    Server_Turn(InputValue);
   }
 }
 
@@ -144,6 +173,7 @@ void ATank::TurnView(const FInputActionValue& Value)
     m_pSpringArm->SetRelativeRotation(NewRotation);
 
     UE_LOG(LogTemp, Warning, TEXT("Turning View"));
+
   }
 }
 
@@ -207,6 +237,8 @@ void ATank::RotateTurret()
 
   FRotator SmoothedRotation = FMath::RInterpTo(CurrentRotation, DesiredRotation, DeltaTime, m_fTurretRotationSpeed);
   m_pTankTurret->SetWorldRotation(FRotator(0.0f, SmoothedRotation.Yaw, 0.0f));
+
+  Server_UpdateTurretRotation(m_pTankTurret->GetComponentRotation());
 }
 
 void ATank::AimCannonToCursor()
@@ -246,6 +278,8 @@ void ATank::AimCannonToCursor()
 
       FRotator SmoothedRotation = FMath::RInterpTo(CurrentRotation, TargetRotation, DeltaTime, m_fCannonPitchSpeed);
       m_pTankCannon->SetRelativeRotation(SmoothedRotation);
+
+      Server_UpdateCannonPitch(SmoothedRotation.Pitch);
     }
   }
 }
@@ -275,5 +309,67 @@ void ATank::UpdateCannonIndicatorWidgetPosition()
   {
     CannonIndicatorWidget->SetPositionInViewport(ScreenPosition, true);
     CannonIndicatorWidget->SetAlignmentInViewport(FVector2D(0.5f, 0.5f));
+  }
+}
+
+// === Multiplayer ===
+
+void ATank::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+  Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
+  DOREPLIFETIME(ATank, MoveInputValueReplicated)
+  DOREPLIFETIME(ATank, TurretRotationReplicated)
+  DOREPLIFETIME(ATank, CannonPitchReplicated)
+}
+
+void ATank::Server_UpdateCannonPitch_Implementation(float NewPitch)
+{
+  CannonPitchReplicated = NewPitch;
+  if (HasAuthority())
+  {
+    m_pTankCannon->SetRelativeRotation(FRotator(NewPitch, 0.0f, 0.0f));
+  }
+}
+
+void ATank::Server_MoveForward_Implementation(float Value)
+{
+  MoveInputValue = Value;
+  MoveInputValueReplicated = Value;
+}
+
+void ATank::Server_Turn_Implementation(float Value)
+{
+  AddActorLocalRotation(FRotator(0.f, Value * m_fTurnSpeed * GetWorld()->GetDeltaSeconds(), 0.0f));
+}
+
+void ATank::Server_UpdateTurretRotation_Implementation(FRotator NewRotation)
+{
+  TurretRotationReplicated = NewRotation;
+
+  if (HasAuthority())
+  {
+    m_pTankTurret->SetWorldRotation(TurretRotationReplicated);
+  }
+}
+
+void ATank::Server_Fire_Implementation()
+{
+}
+
+void ATank::OnRep_TurretRotation()
+{
+  if (!IsLocallyControlled())
+  {
+    m_pTankTurret->SetWorldRotation(TurretRotationReplicated);
+  }
+}
+
+void ATank::OnRep_CannonPitch()
+{
+
+  if (!IsLocallyControlled())
+  {
+    m_pTankCannon->SetRelativeRotation(FRotator(CannonPitchReplicated, 0.0f, 0.0f));
   }
 }
