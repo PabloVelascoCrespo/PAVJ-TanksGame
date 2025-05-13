@@ -10,6 +10,8 @@
 #include "Net/UnrealNetwork.h"
 #include "Components/WidgetComponent.h"
 #include "Components/ProgressBar.h"
+#include "TankGameMode.h"
+#include "TankPlayerController.h"
 
 ATank::ATank()
 {
@@ -37,8 +39,6 @@ ATank::ATank()
   TankHealthWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("TankHealthWidget"));
   TankHealthWidgetComponent->SetupAttachment(m_pTankBody);
   TankHealthWidgetComponent->SetWidgetSpace(EWidgetSpace::World);
-  TankHealthWidgetComponent->SetDrawSize(FVector2D(100.0f, 10.0f));
-  TankHealthWidgetComponent->SetIsReplicated(true);
 
   bReplicates = true;
   SetReplicateMovement(true);
@@ -74,7 +74,9 @@ void ATank::Tick(float DeltaTime)
     break;
   }
 
-  DrawDebugString(GetWorld(), FVector(0.0f, 0.0f, 120.0f), RoleString, this, FColor::Green, DeltaTime);
+  FString Label = FString::Printf(TEXT("%s - Player: %d"), *RoleString, PlayerIndex);
+
+  DrawDebugString(GetWorld(), FVector(0.0f, 0.0f, 120.0f), Label, this, FColor::Green, DeltaTime);
 }
 
 void ATank::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -117,7 +119,18 @@ void ATank::OnRep_CurrentHealth()
 
 void ATank::HandleDestruction()
 {
+  AController* TankController = GetController();
+  DetachFromControllerPendingDestroy();
   Destroy();
+
+  if (HasAuthority() && TankController)
+  {
+    ATankGameMode* GameMode = Cast<ATankGameMode>(GetWorld()->GetAuthGameMode());
+    if (GameMode)
+    {
+      GameMode->RequestRespawn(TankController);
+    }
+  }
 }
 
 void ATank::BeginPlay()
@@ -131,7 +144,7 @@ void ATank::BeginPlay()
       Subsystem->AddMappingContext(m_pInputMaping, 0);
     }
 
-    if (IsLocallyControlled() && CrosshairWidgetClass)
+    /*if (IsLocallyControlled() && CrosshairWidgetClass)
     {
       CrosshairWidget = CreateWidget<UUserWidget>(GetWorld(), CrosshairWidgetClass);
 
@@ -141,7 +154,7 @@ void ATank::BeginPlay()
       }
     }
 
-    if (CannonIndicatorWidgetClass)
+    if (IsLocallyControlled() && CannonIndicatorWidgetClass)
     {
       CannonIndicatorWidget = CreateWidget<UUserWidget>(GetWorld(), CannonIndicatorWidgetClass);
 
@@ -149,9 +162,12 @@ void ATank::BeginPlay()
       {
         CannonIndicatorWidget->AddToViewport();
       }
-    }
+    }*/
   }
   CurrentHealth = MaxHealth;
+
+  UpdateHealthUI();
+
   if (TankHealthWidgetComponent)
   {
     //TankHealthWidgetComponent->SetWidgetClass(TankHealthBarClass);
@@ -165,8 +181,28 @@ void ATank::BeginPlay()
   {
     UE_LOG(LogTemp, Error, TEXT("[%s] TankHealthWidgetComponent is NULL!"), *GetName());
   }
-  UpdateHealthUI();
 
+}
+
+void ATank::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+  Super::EndPlay(EndPlayReason);
+
+  //ATankPlayerController* TankController = Cast<ATankPlayerController>(m_pPC);
+  //if(TankController)
+  //{
+  //  if (TankController->CrosshairWidget)
+  //  {
+  //    TankController->CrosshairWidget->RemoveFromParent();
+  //    TankController->CrosshairWidget = nullptr;
+  //  }
+
+  //  if (TankController->CannonIndicatorWidget)
+  //  {
+  //    TankController->CannonIndicatorWidget->RemoveFromParent();
+  //    TankController->CannonIndicatorWidget = nullptr;
+  //  }
+  //}
 }
 
 void ATank::MoveForward(const FInputActionValue& Value)
@@ -250,6 +286,11 @@ void ATank::Fire(const FInputActionValue& Value)
     return;
   }
 
+  if (IsLocallyControlled())
+  {
+    Client_PlayCameraShake();
+  }
+
   if (!HasAuthority())
   {
     Server_Fire();
@@ -258,10 +299,6 @@ void ATank::Fire(const FInputActionValue& Value)
 
   ExecuteFire();
 
-  if (IsLocallyControlled())
-  {
-    Client_PlayCameraShake();
-  }
 }
 
 void ATank::Server_Fire_Implementation()
@@ -380,11 +417,13 @@ void ATank::UpdateCannonIndicatorWidgetPosition()
     TargetPoint = Hit.ImpactPoint;
   }
 
+  ATankPlayerController* TankController = Cast<ATankPlayerController>(m_pPC);
+
   FVector2D ScreenPosition;
-  if (m_pPC->ProjectWorldLocationToScreen(TargetPoint, ScreenPosition))
+  if (m_pPC->ProjectWorldLocationToScreen(TargetPoint, ScreenPosition) && TankController && TankController->CannonIndicatorWidget)
   {
-    CannonIndicatorWidget->SetPositionInViewport(ScreenPosition, true);
-    CannonIndicatorWidget->SetAlignmentInViewport(FVector2D(0.5f, 0.5f));
+    TankController->CannonIndicatorWidget->SetPositionInViewport(ScreenPosition, true);
+    TankController->CannonIndicatorWidget->SetAlignmentInViewport(FVector2D(0.5f, 0.5f));
   }
 }
 
@@ -398,6 +437,7 @@ void ATank::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimePro
   DOREPLIFETIME(ATank, TurretRotationReplicated);
   DOREPLIFETIME(ATank, CannonPitchReplicated);
   DOREPLIFETIME(ATank, CurrentHealth);
+  DOREPLIFETIME(ATank, PlayerIndex);
 
 }
 
@@ -450,26 +490,31 @@ void ATank::OnRep_CannonPitch()
 
 void ATank::UpdateHealthUI()
 {
-  if (CrosshairWidget)
-  {
-    UProgressBar* HealthBar = Cast<UProgressBar>(CrosshairWidget->GetWidgetFromName(TEXT("PlayerHealthBar")));
-    if (HealthBar)
-    {
-      HealthBar->SetPercent(CurrentHealth / MaxHealth);
-    }
-  }
+  ATankPlayerController* TankController = Cast<ATankPlayerController>(m_pPC);
 
-  if (TankHealthWidgetComponent)
+  if(TankController)
   {
-    UUserWidget* TankWidget = TankHealthWidgetComponent->GetUserWidgetObject();
-    if (TankWidget)
+    if (TankController->CrosshairWidget)
     {
-      UProgressBar* TankBar = Cast<UProgressBar>(TankWidget->GetWidgetFromName(TEXT("HealthProgressBar")));
-      if (TankBar)
+      UProgressBar* HealthBar = Cast<UProgressBar>(TankController->CrosshairWidget->GetWidgetFromName(TEXT("PlayerHealthBar")));
+      if (HealthBar)
       {
-        TankBar->SetPercent(CurrentHealth / MaxHealth);
+        HealthBar->SetPercent(CurrentHealth / MaxHealth);
       }
+    }
 
+    if (TankHealthWidgetComponent)
+    {
+      UUserWidget* TankWidget = TankHealthWidgetComponent->GetUserWidgetObject();
+      if (TankWidget)
+      {
+        UProgressBar* TankBar = Cast<UProgressBar>(TankWidget->GetWidgetFromName(TEXT("HealthProgressBar")));
+        if (TankBar)
+        {
+          TankBar->SetPercent(CurrentHealth / MaxHealth);
+        }
+
+      }
     }
   }
 }

@@ -31,9 +31,14 @@ public:
   virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
   void TakeDamage(float Damage);
+
+  UPROPERTY(Replicated)
+  int32 PlayerIndex;
 protected:
   // Called when the game starts or when spawned
   virtual void BeginPlay() override;
+
+  virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
 
@@ -138,16 +143,18 @@ private:
   UPROPERTY(EditAnywhere, Category = "Combat")
   float MuzzleOffset = 560.0f;
 
+  // ===== UI =====
   UPROPERTY(EditAnywhere, Category = "Combat")
   TSubclassOf<UCameraShakeBase> FireCameraShake;
 
-  UPROPERTY(EditDefaultsOnly, Category = "UI")
-  TSubclassOf<UUserWidget> CrosshairWidgetClass;
-  UUserWidget* CrosshairWidget;
+  //UPROPERTY(EditDefaultsOnly, Category = "UI")
+  //TSubclassOf<UUserWidget> CrosshairWidgetClass;
+  //UUserWidget* CrosshairWidget; 
 
-  UPROPERTY(EditDefaultsOnly, Category = "UI")
-  TSubclassOf<UUserWidget> CannonIndicatorWidgetClass;
-  UUserWidget* CannonIndicatorWidget;
+  //UPROPERTY(EditDefaultsOnly, Category = "UI")
+  //TSubclassOf<UUserWidget> CannonIndicatorWidgetClass;
+  //UUserWidget* CannonIndicatorWidget;
+  // ===== UI =====
 
   void MoveForward(const FInputActionValue& Value);
   void ForwardMovement(float DeltaTime);
