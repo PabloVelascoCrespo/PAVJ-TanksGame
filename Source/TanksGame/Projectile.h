@@ -35,9 +35,18 @@ private:
   UPROPERTY(EditDefaultsOnly, Category = "Combat")
   float LifeSpanSeconds;
 
+  UPROPERTY(EditAnywhere, Category = "Combat")
+  float Damage = 20.0f;
+
   UPROPERTY(EditDefaultsOnly, Category = "Effects")
   UParticleSystem* ImpactEffect;
 
+  UFUNCTION(NetMulticast, Reliable)
+  void Multicast_SpawnImpactEffect(FVector Location);
+
   UFUNCTION()
   void OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit);
+
+  virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
 };

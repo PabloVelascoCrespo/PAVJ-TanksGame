@@ -8,6 +8,8 @@
 #include "Blueprint/UserWidget.h"
 #include "Projectile.h"
 #include "Net/UnrealNetwork.h"
+#include "Components/WidgetComponent.h"
+#include "Components/ProgressBar.h"
 
 ATank::ATank()
 {
@@ -31,6 +33,13 @@ ATank::ATank()
   m_pCamera->SetupAttachment(m_pSpringArm);
   m_pCamera->bUsePawnControlRotation = false;
 
+  // HEALTH
+  TankHealthWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("TankHealthWidget"));
+  TankHealthWidgetComponent->SetupAttachment(m_pTankBody);
+  TankHealthWidgetComponent->SetWidgetSpace(EWidgetSpace::World);
+  TankHealthWidgetComponent->SetDrawSize(FVector2D(100.0f, 10.0f));
+  TankHealthWidgetComponent->SetIsReplicated(true);
+
   bReplicates = true;
   SetReplicateMovement(true);
 }
@@ -39,7 +48,7 @@ void ATank::Tick(float DeltaTime)
 {
   Super::Tick(DeltaTime);
 
-  if(IsLocallyControlled())
+  if (IsLocallyControlled())
   {
     RotateTurret();
     AimCannonToCursor();
@@ -83,6 +92,34 @@ void ATank::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
   }
 }
 
+void ATank::TakeDamage(float Damage)
+{
+  if (!HasAuthority())
+  {
+    return;
+  }
+
+  CurrentHealth = FMath::Clamp(CurrentHealth - Damage, 0.0f, MaxHealth);
+
+  if (CurrentHealth <= 0.0f)
+  {
+    HandleDestruction();
+  }
+
+  UpdateHealthUI();
+}
+
+
+void ATank::OnRep_CurrentHealth()
+{
+  UpdateHealthUI();
+}
+
+void ATank::HandleDestruction()
+{
+  Destroy();
+}
+
 void ATank::BeginPlay()
 {
   Super::BeginPlay();
@@ -94,13 +131,13 @@ void ATank::BeginPlay()
       Subsystem->AddMappingContext(m_pInputMaping, 0);
     }
 
-    if (CrosshairWidgetClass)
+    if (IsLocallyControlled() && CrosshairWidgetClass)
     {
-      UUserWidget* Crosshair = CreateWidget<UUserWidget>(GetWorld(), CrosshairWidgetClass);
+      CrosshairWidget = CreateWidget<UUserWidget>(GetWorld(), CrosshairWidgetClass);
 
-      if (Crosshair)
+      if (CrosshairWidget)
       {
-        Crosshair->AddToViewport();
+        CrosshairWidget->AddToViewport();
       }
     }
 
@@ -114,14 +151,29 @@ void ATank::BeginPlay()
       }
     }
   }
-}
+  CurrentHealth = MaxHealth;
+  if (TankHealthWidgetComponent)
+  {
+    //TankHealthWidgetComponent->SetWidgetClass(TankHealthBarClass);
+    if (IsLocallyControlled())
+    {
+      TankHealthWidgetComponent->SetVisibility(false);
+    }
+    UE_LOG(LogTemp, Error, TEXT("[%s] TankHealthWidgetComponent exists. Role: %d."), *GetName(), (int32)GetLocalRole());
+  }
+  else
+  {
+    UE_LOG(LogTemp, Error, TEXT("[%s] TankHealthWidgetComponent is NULL!"), *GetName());
+  }
+  UpdateHealthUI();
 
+}
 
 void ATank::MoveForward(const FInputActionValue& Value)
 {
   MoveInputValue = Value.Get<float>();
-  
-  if(!HasAuthority())
+
+  if (!HasAuthority())
   {
     Server_MoveForward(MoveInputValue);
   }
@@ -132,7 +184,7 @@ void ATank::ForwardMovement(float DeltaTime)
   float InputToUse = (IsLocallyControlled() || HasAuthority()) ? MoveInputValue : MoveInputValueReplicated;
 
   float TargetSpeed = InputToUse * m_fMaxMoveSpeed;
-  
+
   if (InputToUse != 0)
   {
     m_fMoveSpeed = FMath::FInterpTo(m_fMoveSpeed, TargetSpeed, DeltaTime, m_fAccelerationRate);
@@ -198,6 +250,35 @@ void ATank::Fire(const FInputActionValue& Value)
     return;
   }
 
+  if (!HasAuthority())
+  {
+    Server_Fire();
+    return;
+  }
+
+  ExecuteFire();
+
+  if (IsLocallyControlled())
+  {
+    Client_PlayCameraShake();
+  }
+}
+
+void ATank::Server_Fire_Implementation()
+{
+  ExecuteFire();
+}
+
+void ATank::Client_PlayCameraShake_Implementation()
+{
+  if (m_pPC)
+  {
+    m_pPC->ClientStartCameraShake(FireCameraShake);
+  }
+}
+
+void ATank::ExecuteFire()
+{
   float CurrentTime = GetWorld()->GetTimeSeconds();
 
   if (CurrentTime - LastFireTime >= m_fFireRate)
@@ -214,11 +295,6 @@ void ATank::Fire(const FInputActionValue& Value)
       SpawnParams.Instigator = GetInstigator();
 
       GetWorld()->SpawnActor<AProjectile>(ProjectileClass, SpawnLocation, SpawnRotation, SpawnParams);
-
-      if (m_pPC)
-      {
-        m_pPC->ClientStartCameraShake(FireCameraShake);
-      }
     }
   }
 }
@@ -318,9 +394,11 @@ void ATank::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimePro
 {
   Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
-  DOREPLIFETIME(ATank, MoveInputValueReplicated)
-  DOREPLIFETIME(ATank, TurretRotationReplicated)
-  DOREPLIFETIME(ATank, CannonPitchReplicated)
+  DOREPLIFETIME(ATank, MoveInputValueReplicated);
+  DOREPLIFETIME(ATank, TurretRotationReplicated);
+  DOREPLIFETIME(ATank, CannonPitchReplicated);
+  DOREPLIFETIME(ATank, CurrentHealth);
+
 }
 
 void ATank::Server_UpdateCannonPitch_Implementation(float NewPitch)
@@ -353,10 +431,6 @@ void ATank::Server_UpdateTurretRotation_Implementation(FRotator NewRotation)
   }
 }
 
-void ATank::Server_Fire_Implementation()
-{
-}
-
 void ATank::OnRep_TurretRotation()
 {
   if (!IsLocallyControlled())
@@ -371,5 +445,31 @@ void ATank::OnRep_CannonPitch()
   if (!IsLocallyControlled())
   {
     m_pTankCannon->SetRelativeRotation(FRotator(CannonPitchReplicated, 0.0f, 0.0f));
+  }
+}
+
+void ATank::UpdateHealthUI()
+{
+  if (CrosshairWidget)
+  {
+    UProgressBar* HealthBar = Cast<UProgressBar>(CrosshairWidget->GetWidgetFromName(TEXT("PlayerHealthBar")));
+    if (HealthBar)
+    {
+      HealthBar->SetPercent(CurrentHealth / MaxHealth);
+    }
+  }
+
+  if (TankHealthWidgetComponent)
+  {
+    UUserWidget* TankWidget = TankHealthWidgetComponent->GetUserWidgetObject();
+    if (TankWidget)
+    {
+      UProgressBar* TankBar = Cast<UProgressBar>(TankWidget->GetWidgetFromName(TEXT("HealthProgressBar")));
+      if (TankBar)
+      {
+        TankBar->SetPercent(CurrentHealth / MaxHealth);
+      }
+
+    }
   }
 }

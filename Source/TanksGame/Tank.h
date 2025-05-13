@@ -10,10 +10,11 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
-struct FInputActionValue;
 class UUserWidget;
 class UCameraShakeBase;
 class AProjectile;
+class UWidgetComponent;
+struct FInputActionValue;
 
 UCLASS()
 class TANKSGAME_API ATank : public APawn
@@ -29,11 +30,23 @@ public:
   // Called to bind functionality to input
   virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+  void TakeDamage(float Damage);
 protected:
   // Called when the game starts or when spawned
   virtual void BeginPlay() override;
 
 private:
+
+  UPROPERTY(Replicated, EditAnywhere, Category = "Stats")
+  float MaxHealth = 100.0f;
+
+  UPROPERTY(ReplicatedUsing = OnRep_CurrentHealth)
+  float CurrentHealth;
+
+  UFUNCTION()
+  void OnRep_CurrentHealth();
+
+  void HandleDestruction();
 
   APlayerController* m_pPC;
   // COMPONENTS
@@ -123,13 +136,14 @@ private:
   TSubclassOf<AProjectile> ProjectileClass;
 
   UPROPERTY(EditAnywhere, Category = "Combat")
-  float MuzzleOffset = 540.0f;
+  float MuzzleOffset = 560.0f;
 
   UPROPERTY(EditAnywhere, Category = "Combat")
   TSubclassOf<UCameraShakeBase> FireCameraShake;
 
   UPROPERTY(EditDefaultsOnly, Category = "UI")
   TSubclassOf<UUserWidget> CrosshairWidgetClass;
+  UUserWidget* CrosshairWidget;
 
   UPROPERTY(EditDefaultsOnly, Category = "UI")
   TSubclassOf<UUserWidget> CannonIndicatorWidgetClass;
@@ -166,6 +180,11 @@ private:
   UFUNCTION(Server, Reliable)
   void Server_Fire();
 
+  UFUNCTION(Server, Reliable)
+  void Client_PlayCameraShake();
+
+  void ExecuteFire();
+
   // Variables Replicadas
   UPROPERTY(Replicated)
   float MoveInputValueReplicated;
@@ -181,5 +200,15 @@ private:
 
   UFUNCTION()
   void OnRep_CannonPitch();
+
+  // health system
+
+  void UpdateHealthUI();
+
+  UPROPERTY(VisibleAnywhere, Category = "UI")
+  UWidgetComponent* TankHealthWidgetComponent;
+
+  UPROPERTY(EditDefaultsOnly, Category = "UI")
+  TSubclassOf<UUserWidget> TankHealthBarClass;
 
 };

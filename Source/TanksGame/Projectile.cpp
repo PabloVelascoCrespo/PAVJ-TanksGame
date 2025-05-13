@@ -1,16 +1,17 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
 #include "Projectile.h"
 #include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
-
+#include "Net/UnrealNetwork.h"
+#include "Tank.h"
 // Sets default values
 AProjectile::AProjectile()
 {
   // Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
   PrimaryActorTick.bCanEverTick = false;
+
+  bReplicates = true;
+  SetReplicateMovement(true);
 
   CollisionComponent = CreateDefaultSubobject<USphereComponent>(TEXT("Collision Component"));
   CollisionComponent->InitSphereRadius(15.0f);
@@ -38,14 +39,35 @@ void AProjectile::BeginPlay()
 
 }
 
+void AProjectile::Multicast_SpawnImpactEffect_Implementation(FVector Location)
+{
+  UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactEffect, Location, FRotator::ZeroRotator);
+
+}
+
 void AProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp, FVector NormalImpulse, const FHitResult& Hit)
 {
   if (OtherActor && OtherActor != this)
   {
-    if (ImpactEffect)
+    if (HasAuthority())
     {
-      UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactEffect, Hit.ImpactPoint, FRotator::ZeroRotator);
+      if (ImpactEffect)
+      {
+        Multicast_SpawnImpactEffect(Hit.ImpactPoint);
+      }
+      ATank* HitTank = Cast<ATank>(OtherActor);
+      if (HitTank)
+      {
+        HitTank->TakeDamage(Damage);
+      }
+
+      Destroy();
     }
-    Destroy();
   }
+}
+
+void AProjectile::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+  Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+
 }
