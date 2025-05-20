@@ -4,6 +4,8 @@
 #include "GameFramework/GameModeBase.h"
 #include "TankGameMode.generated.h"
 
+class ATank;
+
 UCLASS()
 class TANKSGAME_API ATankGameMode : public AGameModeBase
 {
@@ -11,6 +13,8 @@ class TANKSGAME_API ATankGameMode : public AGameModeBase
 public:
   UFUNCTION()
   void RequestRespawn(AController* PlayerController);
+
+  void ApplySkinToTank(AController* Controller, ATank* Tank);
 
 protected:
   virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
@@ -20,5 +24,7 @@ protected:
   TArray<AController*> ConnectedPlayers;
 
   int32 PlayerIndex;
+
+  void AssignPlayerIndexToPawn(APlayerController* PlayerController);
 private:
 };

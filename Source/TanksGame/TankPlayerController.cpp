@@ -5,10 +5,10 @@ void ATankPlayerController::BeginPlay()
 {
   Super::BeginPlay();
 
-  if (IsLocalController())
-  {
-    InitializeHUDWidgets();
-  }
+  //if (IsLocalController())
+  //{
+  //  InitializeHUDWidgets();
+  //}
 }
 
 void ATankPlayerController::InitializeHUDWidgets()

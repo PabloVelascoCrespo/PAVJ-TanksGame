@@ -18,26 +18,26 @@ ATank::ATank()
   // Set this pawn to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
   PrimaryActorTick.bCanEverTick = true;
 
-  m_pTankBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Tank Body"));
-  RootComponent = m_pTankBody;
+  TankBody = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Tank Body"));
+  RootComponent = TankBody;
 
-  m_pTankTurret = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Tank Turret"));
-  m_pTankTurret->SetupAttachment(m_pTankBody);
+  TankTurret = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Tank Turret"));
+  TankTurret->SetupAttachment(TankBody);
 
-  m_pTankCannon = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Tank Cannon"));
-  m_pTankCannon->SetupAttachment(m_pTankTurret);
+  TankCannon = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Tank Cannon"));
+  TankCannon->SetupAttachment(TankTurret);
 
-  m_pSpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("Spring Arm"));
-  m_pSpringArm->SetupAttachment(m_pTankBody);
-  m_pSpringArm->bUsePawnControlRotation = false;
+  SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("Spring Arm"));
+  SpringArm->SetupAttachment(TankBody);
+  SpringArm->bUsePawnControlRotation = false;
 
-  m_pCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
-  m_pCamera->SetupAttachment(m_pSpringArm);
-  m_pCamera->bUsePawnControlRotation = false;
+  Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
+  Camera->SetupAttachment(SpringArm);
+  Camera->bUsePawnControlRotation = false;
 
   // HEALTH
   TankHealthWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("TankHealthWidget"));
-  TankHealthWidgetComponent->SetupAttachment(m_pTankBody);
+  TankHealthWidgetComponent->SetupAttachment(TankBody);
   TankHealthWidgetComponent->SetWidgetSpace(EWidgetSpace::World);
 
   bReplicates = true;
@@ -85,16 +85,16 @@ void ATank::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 
   if (UEnhancedInputComponent* Input = Cast<UEnhancedInputComponent>(PlayerInputComponent))
   {
-    Input->BindAction(m_pMoveForwardAction, ETriggerEvent::Triggered, this, &ATank::MoveForward);
-    Input->BindAction(m_pMoveForwardAction, ETriggerEvent::Completed, this, &ATank::MoveForward);
-    Input->BindAction(m_pLookUpAction, ETriggerEvent::Triggered, this, &ATank::LookUp);
-    Input->BindAction(m_pTurnAction, ETriggerEvent::Triggered, this, &ATank::Turn);
-    Input->BindAction(m_pFireAction, ETriggerEvent::Triggered, this, &ATank::Fire);
-    Input->BindAction(m_pRotateTurretAction, ETriggerEvent::Triggered, this, &ATank::TurnView);
+    Input->BindAction(MoveForwardAction, ETriggerEvent::Triggered, this, &ATank::MoveForward);
+    Input->BindAction(MoveForwardAction, ETriggerEvent::Completed, this, &ATank::MoveForward);
+    Input->BindAction(LookUpAction, ETriggerEvent::Triggered, this, &ATank::LookUp);
+    Input->BindAction(TurnAction, ETriggerEvent::Triggered, this, &ATank::Turn);
+    Input->BindAction(FireAction, ETriggerEvent::Triggered, this, &ATank::Fire);
+    Input->BindAction(RotateTurretAction, ETriggerEvent::Triggered, this, &ATank::TurnView);
   }
 }
 
-void ATank::TakeDamage(float Damage)
+void ATank::TakeDmg(float Damage)
 {
   if (!HasAuthority())
   {
@@ -109,6 +109,41 @@ void ATank::TakeDamage(float Damage)
   }
 
   UpdateHealthUI();
+}
+
+void ATank::ApplySkinByIndex(int32 Index)
+{
+  SkinIndex = Index;
+
+  if (!TankBody || !TankTurret || !TankCannon)
+  {
+    return;
+  }
+
+  UMaterialInterface* SelectedMaterial = nullptr;
+
+  switch (Index)
+  {
+  case 0:
+    SelectedMaterial = SkinMaterial0;
+    break;
+  case 1:
+    SelectedMaterial = SkinMaterial1;
+    break;
+  case 2:
+    SelectedMaterial = SkinMaterial2;
+    break;
+  default:
+    SelectedMaterial = SkinMaterial0;
+    break;
+  }
+
+  if (SelectedMaterial)
+  {
+    TankBody->SetMaterial(0, SelectedMaterial);
+    TankTurret->SetMaterial(0, SelectedMaterial);
+    TankCannon->SetMaterial(0, SelectedMaterial);
+  }
 }
 
 
@@ -136,15 +171,58 @@ void ATank::HandleDestruction()
 void ATank::BeginPlay()
 {
   Super::BeginPlay();
-  m_pPC = Cast<APlayerController>(GetController());
-  if (m_pPC)
+
+  if (IsLocallyControlled())
   {
-    if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(m_pPC->GetLocalPlayer()))
+    InitializeLocalPlayerUI();
+  }
+
+  CurrentHealth = MaxHealth;
+
+  UpdateHealthUI();
+}
+
+void ATank::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+  Super::EndPlay(EndPlayReason);
+
+  if (CrosshairWidget)
+  {
+    CrosshairWidget->RemoveFromParent();
+    CrosshairWidget = nullptr;
+  }
+
+  if (CannonIndicatorWidget)
+  {
+    CannonIndicatorWidget->RemoveFromParent();
+    CannonIndicatorWidget = nullptr;
+  }
+
+}
+
+void ATank::PossessedBy(AController* NewController)
+{
+  Super::PossessedBy(NewController);
+  if (IsLocallyControlled())
+  {
+    InitializeLocalPlayerUI();
+  }
+}
+
+void ATank::InitializeLocalPlayerUI()
+{
+  PC = Cast<APlayerController>(GetController());
+  if (PC)
+  {
+    PC->bShowMouseCursor = false;
+    PC->SetInputMode(FInputModeGameOnly());
+
+    if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PC->GetLocalPlayer()))
     {
-      Subsystem->AddMappingContext(m_pInputMaping, 0);
+      Subsystem->AddMappingContext(InputMaping, 0);
     }
 
-    /*if (IsLocallyControlled() && CrosshairWidgetClass)
+    if (CrosshairWidgetClass && !CrosshairWidget)
     {
       CrosshairWidget = CreateWidget<UUserWidget>(GetWorld(), CrosshairWidgetClass);
 
@@ -154,7 +232,7 @@ void ATank::BeginPlay()
       }
     }
 
-    if (IsLocallyControlled() && CannonIndicatorWidgetClass)
+    if (CannonIndicatorWidgetClass && !CannonIndicatorWidget)
     {
       CannonIndicatorWidget = CreateWidget<UUserWidget>(GetWorld(), CannonIndicatorWidgetClass);
 
@@ -162,47 +240,13 @@ void ATank::BeginPlay()
       {
         CannonIndicatorWidget->AddToViewport();
       }
-    }*/
-  }
-  CurrentHealth = MaxHealth;
+    }
 
-  UpdateHealthUI();
-
-  if (TankHealthWidgetComponent)
-  {
-    //TankHealthWidgetComponent->SetWidgetClass(TankHealthBarClass);
-    if (IsLocallyControlled())
+    if (TankHealthWidgetComponent)
     {
       TankHealthWidgetComponent->SetVisibility(false);
     }
-    UE_LOG(LogTemp, Error, TEXT("[%s] TankHealthWidgetComponent exists. Role: %d."), *GetName(), (int32)GetLocalRole());
   }
-  else
-  {
-    UE_LOG(LogTemp, Error, TEXT("[%s] TankHealthWidgetComponent is NULL!"), *GetName());
-  }
-
-}
-
-void ATank::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-  Super::EndPlay(EndPlayReason);
-
-  //ATankPlayerController* TankController = Cast<ATankPlayerController>(m_pPC);
-  //if(TankController)
-  //{
-  //  if (TankController->CrosshairWidget)
-  //  {
-  //    TankController->CrosshairWidget->RemoveFromParent();
-  //    TankController->CrosshairWidget = nullptr;
-  //  }
-
-  //  if (TankController->CannonIndicatorWidget)
-  //  {
-  //    TankController->CannonIndicatorWidget->RemoveFromParent();
-  //    TankController->CannonIndicatorWidget = nullptr;
-  //  }
-  //}
 }
 
 void ATank::MoveForward(const FInputActionValue& Value)
@@ -219,22 +263,22 @@ void ATank::ForwardMovement(float DeltaTime)
 {
   float InputToUse = (IsLocallyControlled() || HasAuthority()) ? MoveInputValue : MoveInputValueReplicated;
 
-  float TargetSpeed = InputToUse * m_fMaxMoveSpeed;
+  float TargetSpeed = InputToUse * MaxMoveSpeed;
 
   if (InputToUse != 0)
   {
-    m_fMoveSpeed = FMath::FInterpTo(m_fMoveSpeed, TargetSpeed, DeltaTime, m_fAccelerationRate);
+    MoveSpeed = FMath::FInterpTo(MoveSpeed, TargetSpeed, DeltaTime, AccelerationRate);
   }
   else
   {
-    m_fMoveSpeed = FMath::FInterpTo(m_fMoveSpeed, 0.0f, DeltaTime, m_fDecelerationRateRate);
+    MoveSpeed = FMath::FInterpTo(MoveSpeed, 0.0f, DeltaTime, DecelerationRateRate);
 
   }
 
-  if (m_fMoveSpeed != 0)
+  if (MoveSpeed != 0)
   {
     FVector Forward = FVector::ForwardVector;
-    AddActorLocalOffset(Forward * m_fMoveSpeed * DeltaTime, true);
+    AddActorLocalOffset(Forward * MoveSpeed * DeltaTime, true);
   }
 }
 
@@ -242,7 +286,7 @@ void ATank::Turn(const FInputActionValue& Value)
 {
   float InputValue = Value.Get<float>();
 
-  AddActorLocalRotation(FRotator(0.f, InputValue * m_fTurnSpeed * GetWorld()->GetDeltaSeconds(), 0.0f));
+  AddActorLocalRotation(FRotator(0.f, InputValue * TurnSpeed * GetWorld()->GetDeltaSeconds(), 0.0f));
 
   if (!HasAuthority())
   {
@@ -254,11 +298,11 @@ void ATank::TurnView(const FInputActionValue& Value)
 {
   float InputValue = Value.Get<float>();
 
-  if (InputComponent != 0 && m_pSpringArm)
+  if (InputComponent != 0 && SpringArm)
   {
-    FRotator NewRotation = m_pSpringArm->GetRelativeRotation();
-    NewRotation.Yaw += InputValue * m_fTurnViewSpeed * GetWorld()->GetDeltaSeconds();
-    m_pSpringArm->SetRelativeRotation(NewRotation);
+    FRotator NewRotation = SpringArm->GetRelativeRotation();
+    NewRotation.Yaw += InputValue * TurnViewSpeed * GetWorld()->GetDeltaSeconds();
+    SpringArm->SetRelativeRotation(NewRotation);
 
     UE_LOG(LogTemp, Warning, TEXT("Turning View"));
 
@@ -269,11 +313,11 @@ void ATank::LookUp(const FInputActionValue& Value)
 {
   float InputValue = Value.Get<float>();
 
-  if (InputComponent != 0 && m_pSpringArm)
+  if (InputComponent != 0 && SpringArm)
   {
-    FRotator NewRotation = m_pSpringArm->GetRelativeRotation();
-    NewRotation.Pitch = FMath::Clamp(NewRotation.Pitch + InputValue * m_fLookUpSpeed * GetWorld()->GetDeltaSeconds(), m_fMinLookUpPitch, m_fMaxLookUpPitch);
-    m_pSpringArm->SetRelativeRotation(NewRotation);
+    FRotator NewRotation = SpringArm->GetRelativeRotation();
+    NewRotation.Pitch = FMath::Clamp(NewRotation.Pitch + InputValue * LookUpSpeed * GetWorld()->GetDeltaSeconds(), MinLookUpPitch, MaxLookUpPitch);
+    SpringArm->SetRelativeRotation(NewRotation);
 
     UE_LOG(LogTemp, Warning, TEXT("Looking Up"));
   }
@@ -308,9 +352,9 @@ void ATank::Server_Fire_Implementation()
 
 void ATank::Client_PlayCameraShake_Implementation()
 {
-  if (m_pPC)
+  if (PC)
   {
-    m_pPC->ClientStartCameraShake(FireCameraShake);
+    PC->ClientStartCameraShake(FireCameraShake);
   }
 }
 
@@ -318,14 +362,14 @@ void ATank::ExecuteFire()
 {
   float CurrentTime = GetWorld()->GetTimeSeconds();
 
-  if (CurrentTime - LastFireTime >= m_fFireRate)
+  if (CurrentTime - LastFireTime >= FireRate)
   {
     LastFireTime = CurrentTime;
 
-    if (ProjectileClass && m_pTankCannon)
+    if (ProjectileClass && TankCannon)
     {
-      FVector SpawnLocation = m_pTankCannon->GetComponentLocation() + m_pTankCannon->GetForwardVector() * MuzzleOffset;
-      FRotator SpawnRotation = m_pTankCannon->GetComponentRotation();
+      FVector SpawnLocation = TankCannon->GetComponentLocation() + TankCannon->GetForwardVector() * MuzzleOffset;
+      FRotator SpawnRotation = TankCannon->GetComponentRotation();
 
       FActorSpawnParameters SpawnParams;
       SpawnParams.Owner = this;
@@ -338,25 +382,25 @@ void ATank::ExecuteFire()
 
 void ATank::RotateTurret()
 {
-  if (!m_pTankTurret)
+  if (!TankTurret)
   {
     return;
   }
 
-  FRotator DesiredRotation = FRotator(0.0f, m_pCamera->GetComponentRotation().Yaw, 0.0f);
-  FRotator CurrentRotation = m_pTankTurret->GetComponentRotation();
+  FRotator DesiredRotation = FRotator(0.0f, Camera->GetComponentRotation().Yaw, 0.0f);
+  FRotator CurrentRotation = TankTurret->GetComponentRotation();
 
   float DeltaTime = GetWorld()->GetDeltaSeconds();
 
-  FRotator SmoothedRotation = FMath::RInterpTo(CurrentRotation, DesiredRotation, DeltaTime, m_fTurretRotationSpeed);
-  m_pTankTurret->SetWorldRotation(FRotator(0.0f, SmoothedRotation.Yaw, 0.0f));
+  FRotator SmoothedRotation = FMath::RInterpTo(CurrentRotation, DesiredRotation, DeltaTime, TurretRotationSpeed);
+  TankTurret->SetWorldRotation(FRotator(0.0f, SmoothedRotation.Yaw, 0.0f));
 
-  Server_UpdateTurretRotation(m_pTankTurret->GetComponentRotation());
+  Server_UpdateTurretRotation(TankTurret->GetComponentRotation());
 }
 
 void ATank::AimCannonToCursor()
 {
-  if (!m_pCamera || !m_pTankCannon || !m_pPC)
+  if (!Camera || !TankCannon || !PC)
   {
     return;
   }
@@ -367,7 +411,7 @@ void ATank::AimCannonToCursor()
 
   FVector WorldLocation, WorldDirection;
 
-  if (m_pPC->DeprojectScreenPositionToWorld(ScreenCenter.X, ScreenCenter.Y, WorldLocation, WorldDirection))
+  if (PC->DeprojectScreenPositionToWorld(ScreenCenter.X, ScreenCenter.Y, WorldLocation, WorldDirection))
   {
     FVector TraceStart = WorldLocation;
     FVector TraceEnd = TraceStart + (WorldDirection * 10000.0f);
@@ -379,18 +423,18 @@ void ATank::AimCannonToCursor()
     {
       FVector AimTarget = Hit.ImpactPoint;
 
-      FVector CannonLocation = m_pTankCannon->GetComponentLocation();
+      FVector CannonLocation = TankCannon->GetComponentLocation();
       FRotator DesiredRotation = UKismetMathLibrary::FindLookAtRotation(CannonLocation, AimTarget);
 
-      float ClampedPitch = FMath::Clamp(DesiredRotation.Pitch, m_fMinCannonPitch, m_fMaxCannonPitch);
+      float ClampedPitch = FMath::Clamp(DesiredRotation.Pitch, MinCannonPitch, MaxCannonPitch);
 
-      FRotator CurrentRotation = m_pTankCannon->GetRelativeRotation();
+      FRotator CurrentRotation = TankCannon->GetRelativeRotation();
       FRotator TargetRotation = FRotator(ClampedPitch, 0.0f, 0.0f);
 
       float DeltaTime = GetWorld()->GetDeltaSeconds();
 
-      FRotator SmoothedRotation = FMath::RInterpTo(CurrentRotation, TargetRotation, DeltaTime, m_fCannonPitchSpeed);
-      m_pTankCannon->SetRelativeRotation(SmoothedRotation);
+      FRotator SmoothedRotation = FMath::RInterpTo(CurrentRotation, TargetRotation, DeltaTime, CannonPitchSpeed);
+      TankCannon->SetRelativeRotation(SmoothedRotation);
 
       Server_UpdateCannonPitch(SmoothedRotation.Pitch);
     }
@@ -399,13 +443,13 @@ void ATank::AimCannonToCursor()
 
 void ATank::UpdateCannonIndicatorWidgetPosition()
 {
-  if (!m_pPC || !m_pTankCannon)
+  if (!PC || !TankCannon)
   {
     return;
   }
 
-  FVector Start = m_pTankCannon->GetComponentLocation();
-  FVector End = Start + m_pTankCannon->GetForwardVector() * 10000.0f;
+  FVector Start = TankCannon->GetComponentLocation();
+  FVector End = Start + TankCannon->GetForwardVector() * 10000.0f;
 
   FHitResult Hit;
   FCollisionQueryParams Params;
@@ -417,13 +461,11 @@ void ATank::UpdateCannonIndicatorWidgetPosition()
     TargetPoint = Hit.ImpactPoint;
   }
 
-  ATankPlayerController* TankController = Cast<ATankPlayerController>(m_pPC);
-
   FVector2D ScreenPosition;
-  if (m_pPC->ProjectWorldLocationToScreen(TargetPoint, ScreenPosition) && TankController && TankController->CannonIndicatorWidget)
+  if (PC->ProjectWorldLocationToScreen(TargetPoint, ScreenPosition) && CannonIndicatorWidget)
   {
-    TankController->CannonIndicatorWidget->SetPositionInViewport(ScreenPosition, true);
-    TankController->CannonIndicatorWidget->SetAlignmentInViewport(FVector2D(0.5f, 0.5f));
+    CannonIndicatorWidget->SetPositionInViewport(ScreenPosition, true);
+    CannonIndicatorWidget->SetAlignmentInViewport(FVector2D(0.5f, 0.5f));
   }
 }
 
@@ -438,6 +480,7 @@ void ATank::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimePro
   DOREPLIFETIME(ATank, CannonPitchReplicated);
   DOREPLIFETIME(ATank, CurrentHealth);
   DOREPLIFETIME(ATank, PlayerIndex);
+  DOREPLIFETIME(ATank, SkinIndex);
 
 }
 
@@ -446,7 +489,7 @@ void ATank::Server_UpdateCannonPitch_Implementation(float NewPitch)
   CannonPitchReplicated = NewPitch;
   if (HasAuthority())
   {
-    m_pTankCannon->SetRelativeRotation(FRotator(NewPitch, 0.0f, 0.0f));
+    TankCannon->SetRelativeRotation(FRotator(NewPitch, 0.0f, 0.0f));
   }
 }
 
@@ -458,7 +501,7 @@ void ATank::Server_MoveForward_Implementation(float Value)
 
 void ATank::Server_Turn_Implementation(float Value)
 {
-  AddActorLocalRotation(FRotator(0.f, Value * m_fTurnSpeed * GetWorld()->GetDeltaSeconds(), 0.0f));
+  AddActorLocalRotation(FRotator(0.f, Value * TurnSpeed * GetWorld()->GetDeltaSeconds(), 0.0f));
 }
 
 void ATank::Server_UpdateTurretRotation_Implementation(FRotator NewRotation)
@@ -467,7 +510,7 @@ void ATank::Server_UpdateTurretRotation_Implementation(FRotator NewRotation)
 
   if (HasAuthority())
   {
-    m_pTankTurret->SetWorldRotation(TurretRotationReplicated);
+    TankTurret->SetWorldRotation(TurretRotationReplicated);
   }
 }
 
@@ -475,46 +518,44 @@ void ATank::OnRep_TurretRotation()
 {
   if (!IsLocallyControlled())
   {
-    m_pTankTurret->SetWorldRotation(TurretRotationReplicated);
+    TankTurret->SetWorldRotation(TurretRotationReplicated);
   }
 }
 
 void ATank::OnRep_CannonPitch()
 {
-
   if (!IsLocallyControlled())
   {
-    m_pTankCannon->SetRelativeRotation(FRotator(CannonPitchReplicated, 0.0f, 0.0f));
+    TankCannon->SetRelativeRotation(FRotator(CannonPitchReplicated, 0.0f, 0.0f));
   }
 }
 
 void ATank::UpdateHealthUI()
 {
-  ATankPlayerController* TankController = Cast<ATankPlayerController>(m_pPC);
-
-  if(TankController)
+  if (CrosshairWidget)
   {
-    if (TankController->CrosshairWidget)
+    UProgressBar* HealthBar = Cast<UProgressBar>(CrosshairWidget->GetWidgetFromName(TEXT("PlayerHealthBar")));
+    if (HealthBar)
     {
-      UProgressBar* HealthBar = Cast<UProgressBar>(TankController->CrosshairWidget->GetWidgetFromName(TEXT("PlayerHealthBar")));
-      if (HealthBar)
-      {
-        HealthBar->SetPercent(CurrentHealth / MaxHealth);
-      }
+      HealthBar->SetPercent(CurrentHealth / MaxHealth);
     }
+  }
 
-    if (TankHealthWidgetComponent)
+  if (TankHealthWidgetComponent)
+  {
+    UUserWidget* TankWidget = TankHealthWidgetComponent->GetUserWidgetObject();
+    if (TankWidget)
     {
-      UUserWidget* TankWidget = TankHealthWidgetComponent->GetUserWidgetObject();
-      if (TankWidget)
+      UProgressBar* TankBar = Cast<UProgressBar>(TankWidget->GetWidgetFromName(TEXT("HealthProgressBar")));
+      if (TankBar)
       {
-        UProgressBar* TankBar = Cast<UProgressBar>(TankWidget->GetWidgetFromName(TEXT("HealthProgressBar")));
-        if (TankBar)
-        {
-          TankBar->SetPercent(CurrentHealth / MaxHealth);
-        }
-
+        TankBar->SetPercent(CurrentHealth / MaxHealth);
       }
     }
   }
+}
+
+void ATank::OnRep_SkinIndex()
+{
+  ApplySkinByIndex(SkinIndex);
 }

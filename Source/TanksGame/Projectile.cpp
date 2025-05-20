@@ -58,7 +58,7 @@ void AProjectile::OnHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimi
       ATank* HitTank = Cast<ATank>(OtherActor);
       if (HitTank)
       {
-        HitTank->TakeDamage(Damage);
+        HitTank->TakeDmg(Damage);
       }
 
       Destroy();
