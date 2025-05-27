@@ -13,5 +13,15 @@ UCLASS()
 class TANKSGAME_API ALobbyPlayerState : public APlayerState
 {
 	GENERATED_BODY()
-	
+public:
+	UPROPERTY(ReplicatedUsing = OnRep_IsReady)
+	bool bIsReady = false;
+
+	void SetReady(bool bIsReady);
+protected:
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION()
+	void OnRep_IsReady();
+private:
 };

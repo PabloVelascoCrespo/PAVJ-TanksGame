@@ -22,13 +22,13 @@ protected:
 
 private:
   UPROPERTY(VisibleAnywhere)
-  USphereComponent* CollisionComponent;
+  TObjectPtr<USphereComponent>  CollisionComponent;
 
   UPROPERTY(VisibleAnywhere)
-  UStaticMeshComponent* Mesh;
+  TObjectPtr<UStaticMeshComponent> Mesh;
 
   UPROPERTY(VisibleAnywhere)
-  UProjectileMovementComponent* ProjectileMovement;
+  TObjectPtr<UProjectileMovementComponent> ProjectileMovement;
 
   UPROPERTY(EditDefaultsOnly, Category = "Combat")
   float LifeSpanSeconds;
@@ -37,7 +37,7 @@ private:
   float Damage = 20.0f;
 
   UPROPERTY(EditDefaultsOnly, Category = "Effects")
-  UParticleSystem* ImpactEffect;
+  TObjectPtr<UParticleSystem> ImpactEffect;
 
   UFUNCTION(NetMulticast, Reliable)
   void Multicast_SpawnImpactEffect(FVector Location);

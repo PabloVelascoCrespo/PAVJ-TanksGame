@@ -1,6 +1,7 @@
 #include "TankGameMode.h"
 #include "Tank.h"
 #include "GameFramework/PlayerState.h"
+#include "GameFramework/GameStateBase.h"
 #include "TanksGameInstance.h"
 
 void ATankGameMode::RequestRespawn(AController* PlayerController)
@@ -11,25 +12,30 @@ void ATankGameMode::RequestRespawn(AController* PlayerController)
   }
 
   FTimerHandle RespawnHandle;
-  GetWorld()->GetTimerManager().SetTimer(RespawnHandle, 
+  GetWorld()->GetTimerManager().SetTimer(RespawnHandle,
     [this, PlayerController]()
     {
       RestartPlayer(PlayerController);
-      
+
       //AssignPlayerIndexToPawn(Cast<APlayerController>(PlayerController));
 
       FTimerHandle AssingIndexHandle;
-      GetWorld()->GetTimerManager().SetTimer(AssingIndexHandle, 
+      GetWorld()->GetTimerManager().SetTimer(AssingIndexHandle,
         [this, PlayerController]()
         {
-          ATank* Tank = Cast<ATank>(PlayerController->GetPawn());
-          if (Tank)
+          if (!PlayerController)
           {
-            PlayerIndex = ConnectedPlayers.IndexOfByKey(PlayerController);
-            Tank->PlayerIndex = PlayerIndex;
-            ApplySkinToTank(PlayerController, Tank);
+            return;
           }
-        }, 0.2f, false);
+          if (APawn* PAwn = PlayerController->GetPawn())
+          {
+            InitTankFromPlayer(PlayerController);
+          }
+          else
+          {
+            RequestRespawn(PlayerController);
+          }
+        }, 0.5f, false);
     }, 5.0f, false);
 
 }
@@ -63,7 +69,8 @@ AActor* ATankGameMode::ChoosePlayerStart_Implementation(AController* Player)
   }
 
 
-  PlayerIndex = ConnectedPlayers.IndexOfByKey(Player);
+  int32 PlayerIndex = ConnectedPlayers.IndexOfByKey(Player);
+
   FString TagToSearch = FString::FromInt(PlayerIndex);
 
   AActor* FoundStart = FindPlayerStart(Player, TagToSearch);
@@ -80,33 +87,38 @@ void ATankGameMode::PostLogin(APlayerController* NewPlayer)
 {
   Super::PostLogin(NewPlayer);
 
-  //AssignPlayerIndexToPawn(NewPlayer);
-
   APawn* PlayerPawn = NewPlayer->GetPawn();
   if (!PlayerPawn)
   {
     FTimerHandle TimeHandler;
     GetWorld()->GetTimerManager().SetTimer(TimeHandler, [this, NewPlayer]()
       {
-        ATank* Tank = Cast<ATank>(NewPlayer->GetPawn());
-        if (Tank)
-        {
-          Tank->PlayerIndex = PlayerIndex;
-          ApplySkinToTank(NewPlayer, Tank);
-        }
-      }, 0.2f, false);
-  }
-  else
-  {
-    ATank* Tank = Cast<ATank>(NewPlayer->GetPawn());
-    if (Tank)
-    {
-      Tank->PlayerIndex = PlayerIndex;
-      ApplySkinToTank(NewPlayer, Tank);
-    }
+        InitTankFromPlayer(NewPlayer);
+
+      }, 0.1f, false);
+
+    //  FTimerHandle TimeHandler;
+    //  GetWorld()->GetTimerManager().SetTimer(TimeHandler, [this, NewPlayer]()
+    //    {
+    //      ATank* Tank = Cast<ATank>(NewPlayer->GetPawn());
+    //      if (Tank)
+    //      {
+    //        Tank->PlayerIndex = PlayerIndex;
+    //        ApplySkinToTank(NewPlayer, Tank);
+    //      }
+    //    }, 0.2f, false);
+    //}
+    //else
+    //{
+    //  ATank* Tank = Cast<ATank>(NewPlayer->GetPawn());
+    //  if (Tank)
+    //  {
+    //    Tank->PlayerIndex = PlayerIndex;
+    //    ApplySkinToTank(NewPlayer, Tank);
+    //  }
+    //}
   }
 }
-
 void ATankGameMode::AssignPlayerIndexToPawn(APlayerController* PlayerController)
 {
   if (!PlayerController || !PlayerController->PlayerState)
@@ -132,5 +144,29 @@ void ATankGameMode::AssignPlayerIndexToPawn(APlayerController* PlayerController)
       {
         AssignPlayerIndexToPawn(PlayerController);
       }, 0.2f, false);
+  }
+}
+
+void ATankGameMode::InitTankFromPlayer(AController* Controller)
+{
+  if (!Controller || !Controller->PlayerState)
+  {
+    return;
+  }
+
+  if (UTanksGameInstance* GI = Cast<UTanksGameInstance>(GetGameInstance()))
+  {
+    int32 PlayerIndex = GetWorld()->GetGameState()->PlayerArray.IndexOfByKey(Controller->PlayerState);
+    //int32 SkinIndex = GI->GetPlayerSkinByIndex(PlayerIndex);
+
+    if (APawn* Pawn = Controller->GetPawn())
+    {
+      if (ATank* Tank = Cast<ATank>(Pawn))
+      {
+        Tank->PlayerIndex = PlayerIndex;
+        //Tank->ApplySkinByIndex(SkinIndex);
+
+      }
+    }
   }
 }

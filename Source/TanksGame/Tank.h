@@ -60,42 +60,42 @@ private:
 
   void HandleDestruction();
 
-  APlayerController* PC;
+  TObjectPtr<APlayerController> PC;
   // COMPONENTS
 
   UPROPERTY(VisibleAnywhere, meta = (DisplayName = "Tank Body"))
-  UStaticMeshComponent* TankBody;
+  TObjectPtr<UStaticMeshComponent> TankBody;
 
   UPROPERTY(VisibleAnywhere, meta = (DisplayName = "Tank Turret"))
-  UStaticMeshComponent* TankTurret;
+  TObjectPtr<UStaticMeshComponent> TankTurret;
 
   UPROPERTY(VisibleAnywhere, meta = (DisplayName = "Tank Cannon"))
-  UStaticMeshComponent* TankCannon;
+  TObjectPtr<UStaticMeshComponent> TankCannon;
 
   UPROPERTY(VisibleAnywhere, meta = (DisplayName = "Spring Arm"))
-  USpringArmComponent* SpringArm;
+  TObjectPtr<USpringArmComponent> SpringArm;
 
   UPROPERTY(VisibleAnywhere, meta = (DisplayName = "Camera"))
-  UCameraComponent* Camera;
+  TObjectPtr<UCameraComponent> Camera;
 
   // INPUT
   UPROPERTY(EditAnywhere, Category = "Input", meta = (DisplayName = "Input Map"))
-  UInputMappingContext* InputMaping;
+  TObjectPtr<UInputMappingContext> InputMaping;
 
   UPROPERTY(EditAnywhere, Category = "Input", meta = (DisplayName = "Move Forward Action"))
-  UInputAction* MoveForwardAction;
+  TObjectPtr<UInputAction> MoveForwardAction;
 
   UPROPERTY(EditAnywhere, Category = "Input", meta = (DisplayName = "Turn Action"))
-  UInputAction* TurnAction;
+  TObjectPtr<UInputAction> TurnAction;
 
   UPROPERTY(EditAnywhere, Category = "Input", meta = (DisplayName = "Rotate Turret Action"))
-  UInputAction* RotateTurretAction;
+  TObjectPtr<UInputAction> RotateTurretAction;
 
   UPROPERTY(EditAnywhere, Category = "Input", meta = (DisplayName = "Look Up Action"))
-  UInputAction* LookUpAction;
+  TObjectPtr<UInputAction> LookUpAction;
 
   UPROPERTY(EditAnywhere, Category = "Input", meta = (DisplayName = "Fire Action"))
-  UInputAction* FireAction;
+  TObjectPtr<UInputAction> FireAction;
 
   // MOVEMENT
   UPROPERTY(EditAnywhere, Category = "Movement", meta = (DisplayName = "Move Speed"))
@@ -156,11 +156,11 @@ private:
 
   UPROPERTY(EditDefaultsOnly, Category = "UI")
   TSubclassOf<UUserWidget> CrosshairWidgetClass;
-  UUserWidget* CrosshairWidget; 
+  TObjectPtr<UUserWidget> CrosshairWidget;
 
   UPROPERTY(EditDefaultsOnly, Category = "UI")
   TSubclassOf<UUserWidget> CannonIndicatorWidgetClass;
-  UUserWidget* CannonIndicatorWidget;
+  TObjectPtr<UUserWidget> CannonIndicatorWidget;
   // ===== UI =====
 
   void MoveForward(const FInputActionValue& Value);
@@ -220,19 +220,19 @@ private:
   void UpdateHealthUI();
 
   UPROPERTY(VisibleAnywhere, Category = "UI")
-  UWidgetComponent* TankHealthWidgetComponent;
+  TObjectPtr<UWidgetComponent> TankHealthWidgetComponent;
 
   UPROPERTY(EditDefaultsOnly, Category = "UI")
   TSubclassOf<UUserWidget> TankHealthBarClass;
 
   UPROPERTY(EditDefaultsOnly, Category = "Skins")
-  UMaterialInterface* SkinMaterial0;
+  TObjectPtr<UMaterialInterface> SkinMaterial0;
 
   UPROPERTY(EditDefaultsOnly, Category = "Skins")
-  UMaterialInterface* SkinMaterial1;
+  TObjectPtr<UMaterialInterface>  SkinMaterial1;
 
   UPROPERTY(EditDefaultsOnly, Category = "Skins")
-  UMaterialInterface* SkinMaterial2;
+  TObjectPtr<UMaterialInterface> SkinMaterial2;
 
   UPROPERTY(ReplicatedUsing = OnRep_SkinIndex)
   int32 SkinIndex;

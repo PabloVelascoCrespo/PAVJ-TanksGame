@@ -21,10 +21,12 @@ protected:
 
   virtual void PostLogin(APlayerController* NewPlayer) override;
 
-  TArray<AController*> ConnectedPlayers;
+  TArray<TObjectPtr<AController>> ConnectedPlayers;
 
   int32 PlayerIndex;
 
   void AssignPlayerIndexToPawn(APlayerController* PlayerController);
+
 private:
+  void InitTankFromPlayer(AController* Controller);
 };

@@ -9,8 +9,8 @@ class TANKSGAME_API ATankPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 public:
-  UUserWidget* CrosshairWidget;
-  UUserWidget* CannonIndicatorWidget;
+  TObjectPtr<UUserWidget> CrosshairWidget;
+  TObjectPtr<UUserWidget> CannonIndicatorWidget;
 
 protected:
 	virtual void BeginPlay() override;
