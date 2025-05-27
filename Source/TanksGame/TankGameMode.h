@@ -23,7 +23,7 @@ protected:
 
   TArray<TObjectPtr<AController>> ConnectedPlayers;
 
-  int32 PlayerIndex;
+  //int32 PlayerIndex;
 
   void AssignPlayerIndexToPawn(APlayerController* PlayerController);
 

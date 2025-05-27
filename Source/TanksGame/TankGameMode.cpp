@@ -126,7 +126,7 @@ void ATankGameMode::AssignPlayerIndexToPawn(APlayerController* PlayerController)
     return;
   }
 
-  PlayerIndex = PlayerController->PlayerState->GetPlayerId();
+  int32 PlayerIndex = PlayerController->PlayerState->GetPlayerId();
   APawn* PlayerPawn = PlayerController->GetPawn();
   if (PlayerPawn)
   {
