@@ -35,7 +35,7 @@ void ATankGameMode::RequestRespawn(AController* PlayerController)
           {
             RequestRespawn(PlayerController);
           }
-        }, 0.5f, false);
+        }, 0.2f, false);
     }, 5.0f, false);
 
 }
@@ -157,15 +157,14 @@ void ATankGameMode::InitTankFromPlayer(AController* Controller)
   if (UTanksGameInstance* GI = Cast<UTanksGameInstance>(GetGameInstance()))
   {
     int32 PlayerIndex = GetWorld()->GetGameState()->PlayerArray.IndexOfByKey(Controller->PlayerState);
-    //int32 SkinIndex = GI->GetPlayerSkinByIndex(PlayerIndex);
+    int32 SkinIndex = GI->GetPlayerSkinByIndex(PlayerIndex);
 
     if (APawn* Pawn = Controller->GetPawn())
     {
       if (ATank* Tank = Cast<ATank>(Pawn))
       {
         Tank->PlayerIndex = PlayerIndex;
-        //Tank->ApplySkinByIndex(SkinIndex);
-
+        Tank->ApplySkinByIndex(SkinIndex);
       }
     }
   }

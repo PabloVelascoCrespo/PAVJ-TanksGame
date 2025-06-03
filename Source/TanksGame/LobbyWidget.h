@@ -9,6 +9,7 @@
 class UScrollBox;
 class UComboBoxString;
 class UButton;
+class ATankPreviewActor;
 
 UCLASS()
 class TANKSGAME_API ULobbyWidget : public UUserWidget
@@ -45,9 +46,16 @@ public:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UButton> StartGameButton;
 
+	void SetTankPreviewActor(ATankPreviewActor* PreviewActor);
+
 protected:
 	virtual void NativeConstruct() override;
 
 	void RefreshScrollBox();
+
 private:
+	UPROPERTY()
+	TObjectPtr<ATankPreviewActor> TankPreview;
+
+	void UpdateTankPreviewSkin(int32 SkinIndex);
 };
