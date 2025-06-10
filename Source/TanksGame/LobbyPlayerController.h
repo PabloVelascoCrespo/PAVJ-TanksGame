@@ -11,30 +11,30 @@ class ATankPreviewActor;
 UCLASS()
 class TANKSGAME_API ALobbyPlayerController : public APlayerController
 {
-	GENERATED_BODY()
+  GENERATED_BODY()
 public:
-	virtual void BeginPlay() override;
+  virtual void BeginPlay() override;
 
-	UFUNCTION(Server, Reliable)
-	void Server_SetReadyStatus(bool bIsReady);
+  UFUNCTION(Server, Reliable)
+  void Server_SetReadyStatus(bool bIsReady);
 
-	UFUNCTION(Server, Reliable)
-	void Server_RequestStartGame(FName SelectedMap);
+  UFUNCTION(Server, Reliable)
+  void Server_RequestStartGame(FName SelectedMap);
 
-	UFUNCTION(Server, Reliable)
-	void Server_SetSkinIndex(uint32 SkinIndex);
+  UFUNCTION(Server, Reliable)
+  void Server_SetSkinIndex(uint32 SkinIndex);
 
-	// UI
-	UPROPERTY(EditDefaultsOnly, Category = "UI")
-	TSubclassOf<ULobbyWidget> LobbyWidgetClass;
+  // UI
+  UPROPERTY(EditDefaultsOnly, Category = "UI")
+  TSubclassOf<ULobbyWidget> LobbyWidgetClass;
 
-	UPROPERTY()
-	TObjectPtr<ULobbyWidget> LobbyWidget;
+  UPROPERTY()
+  TObjectPtr<ULobbyWidget> LobbyWidget;
 protected:
 private:
-	UPROPERTY()
-	TObjectPtr<ATankPreviewActor> TankPreview;
+  UPROPERTY()
+  TObjectPtr<ATankPreviewActor> TankPreview;
 
-	UPROPERTY(EditDefaultsOnly, Category = "Skin")
-	TSubclassOf<ATankPreviewActor> TankPreviewClass;
+  UPROPERTY(EditDefaultsOnly, Category = "Skin")
+  TSubclassOf<ATankPreviewActor> TankPreviewClass;
 };

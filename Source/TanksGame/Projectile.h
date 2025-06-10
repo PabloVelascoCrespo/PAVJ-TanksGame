@@ -20,6 +20,9 @@ protected:
   // Called when the game starts or when spawned
   virtual void BeginPlay() override;
 
+  UPROPERTY(EditDefaultsOnly, Category = "Audio")
+  TArray<TObjectPtr<USoundBase>> ImpactSounds;
+
 private:
   UPROPERTY(VisibleAnywhere)
   TObjectPtr<USphereComponent>  CollisionComponent;

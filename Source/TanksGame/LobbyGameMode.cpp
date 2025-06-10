@@ -9,7 +9,7 @@ void ALobbyGameMode::StartGame(FName MapName)
   {
     return;
   }
-  
+
   if (!AreAllPlayerReady())
   {
     return;

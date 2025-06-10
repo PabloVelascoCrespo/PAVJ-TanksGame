@@ -37,6 +37,9 @@ public:
 
   UPROPERTY(Replicated)
   int32 PlayerIndex;
+
+
+
 protected:
   // Called when the game starts or when spawned
   virtual void BeginPlay() override;
@@ -45,6 +48,36 @@ protected:
 
   virtual void PossessedBy(AController* NewController) override;
 
+  // Muzzle Flash
+  UPROPERTY(VisibleAnywhere, Category = "Effects")
+  TObjectPtr<USceneComponent> MuzzleFlashPoint;
+
+  UPROPERTY(EditDefaultsOnly, Category = "Effects")
+  TObjectPtr<UParticleSystem> MuzzleFlash;
+
+  UFUNCTION(NetMulticast, Reliable)
+  void Multicast_SpawnMuzzleEffect();
+
+  // AUTOPILOT
+  UPROPERTY(EditAnywhere, Category = "Auto Pilot")
+  bool bAutoPilot;
+
+  void AutoPilotTick();
+
+  FTimerHandle AutoPilotTimerHandle;
+  int32 AutoPilotStep;
+
+  //SOUND
+  UPROPERTY(EditDefaultsOnly, Category = "Audio")
+  TObjectPtr<USoundBase> EngineSound;
+
+  UPROPERTY()
+  TObjectPtr<UAudioComponent> EngineSoundComponent;
+
+  void UpdateEngineSound();
+
+  UFUNCTION(NetMulticast, Reliable)
+  void Multicast_PlayEngineSound(bool bIsMoving);
 private:
 
   void InitializeLocalPlayerUI();
@@ -142,7 +175,7 @@ private:
   UPROPERTY(EditAnywhere, Category = "Combat", meta = (DisplayName = "Fire Rate"))
   float FireRate = 0.7f;
 
-  float LastFireTime = -INFINITY;
+  float LastFireTime = 0.0f;
 
   UPROPERTY(EditAnywhere, Category = "Combat")
   TSubclassOf<AProjectile> ProjectileClass;
@@ -191,7 +224,7 @@ private:
   UFUNCTION(Server, Reliable)
   void Server_UpdateCannonPitch(float NewPitch);
 
-  UFUNCTION(Server, Reliable)
+  UFUNCTION(Server, Reliable, WithValidation)
   void Server_Fire();
 
   UFUNCTION(Server, Reliable)
@@ -240,4 +273,18 @@ private:
   UFUNCTION()
   void OnRep_SkinIndex();
 
+  // AUDIO
+  UPROPERTY(EditDefaultsOnly, Category = "Audio")
+  TArray<TObjectPtr<USoundBase>> CloseFireSounds;
+
+  UPROPERTY(EditDefaultsOnly, Category = "Audio")
+  TArray<TObjectPtr<USoundBase>> DistantFireSounds;
+
+  UPROPERTY(EditDefaultsOnly, Category = "Audio")
+  float DistantSoundTriggerRange = 10000.0f;
+
+  void PlaySoundAtLocation(const TArray<USoundBase*>& SoundArray, const FVector Location, const float Volume);
+
+  UFUNCTION(NetMulticast, Unreliable)
+  void Multicast_PlayFireSound(FVector Location);
 };

@@ -41,7 +41,34 @@ void AProjectile::BeginPlay()
 
 void AProjectile::Multicast_SpawnImpactEffect_Implementation(FVector Location)
 {
-  UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactEffect, Location, FRotator::ZeroRotator);
+  if (ImpactEffect)
+  {
+    UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactEffect, Location, FRotator::ZeroRotator);
+  }
+  if (ImpactSounds.Num() > 0)
+  {
+    APlayerController* PC = GEngine->GetFirstLocalPlayerController(GetWorld());
+    if (!PC || !PC->PlayerCameraManager)
+    {
+      return;
+    }
+    FVector ListenerLocation = PC->PlayerCameraManager->GetCameraLocation();
+    float Distance = FVector::Dist(ListenerLocation, Location);
+
+    float Volume = 1.0f;
+    const float MinVolume = 0.2f;
+    const float MaxDistance = 80000.0f;
+
+    Volume = FMath::GetMappedRangeValueClamped(FVector2D(0.0f, MaxDistance), FVector2D(1.0f, MinVolume), Distance);
+
+    int32 RandomIndex = FMath::RandRange(0, ImpactSounds.Num() - 1);
+    USoundBase* SelectedSound = ImpactSounds[RandomIndex];
+
+    if (SelectedSound)
+    {
+      UGameplayStatics::PlaySoundAtLocation(this, SelectedSound, Location, Volume);
+    }
+  }
 
 }
 

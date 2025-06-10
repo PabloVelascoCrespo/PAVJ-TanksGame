@@ -7,13 +7,13 @@
 UCLASS()
 class TANKSGAME_API ATankPlayerController : public APlayerController
 {
-	GENERATED_BODY()
+  GENERATED_BODY()
 public:
   TObjectPtr<UUserWidget> CrosshairWidget;
   TObjectPtr<UUserWidget> CannonIndicatorWidget;
 
 protected:
-	virtual void BeginPlay() override;
+  virtual void BeginPlay() override;
 private:
 
   UPROPERTY(EditDefaultsOnly, Category = "UI")

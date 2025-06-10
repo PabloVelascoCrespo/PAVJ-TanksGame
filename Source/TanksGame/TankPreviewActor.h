@@ -9,21 +9,21 @@
 UCLASS()
 class TANKSGAME_API ATankPreviewActor : public AActor
 {
-	GENERATED_BODY()
-	
-public:	
-	// Sets default values for this actor's properties
-	ATankPreviewActor();
+  GENERATED_BODY()
+
+public:
+  // Sets default values for this actor's properties
+  ATankPreviewActor();
 
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
+  // Called when the game starts or when spawned
+  virtual void BeginPlay() override;
 
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+public:
+  // Called every frame
+  virtual void Tick(float DeltaTime) override;
 
-	UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Skin")
-	void ApplySkinByIndex(int32 Index);
+  UFUNCTION(BlueprintImplementableEvent, BlueprintCallable, Category = "Skin")
+  void ApplySkinByIndex(int32 Index);
 
 };

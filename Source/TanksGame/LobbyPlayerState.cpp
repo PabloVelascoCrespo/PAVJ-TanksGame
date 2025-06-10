@@ -17,5 +17,5 @@ void ALobbyPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 
 void ALobbyPlayerState::OnRep_IsReady()
 {
-  
+
 }

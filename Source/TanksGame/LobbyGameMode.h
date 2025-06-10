@@ -7,15 +7,15 @@
 UCLASS()
 class TANKSGAME_API ALobbyGameMode : public AGameModeBase
 {
-	GENERATED_BODY()
+  GENERATED_BODY()
 
 public:
-	UFUNCTION(BlueprintCallable)
-	void StartGame(FName MapName);
+  UFUNCTION(BlueprintCallable)
+  void StartGame(FName MapName);
 
-	bool AreAllPlayerReady() const;
+  bool AreAllPlayerReady() const;
 protected:
 
 private:
-	
+
 };

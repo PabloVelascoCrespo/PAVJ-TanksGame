@@ -14,48 +14,48 @@ class ATankPreviewActor;
 UCLASS()
 class TANKSGAME_API ULobbyWidget : public UUserWidget
 {
-	GENERATED_BODY()
+  GENERATED_BODY()
 public:
-	UFUNCTION(BlueprintCallable)
-	void UpdatePlayerList();
+  UFUNCTION(BlueprintCallable)
+  void UpdatePlayerList();
 
-	UFUNCTION(BlueprintCallable)
-	void SetReady(bool bIsReady);
+  UFUNCTION(BlueprintCallable)
+  void SetReady(bool bIsReady);
 
-	UFUNCTION (BlueprintCallable)
-	void OnSkinSelected(const FString& SelectedSking);
+  UFUNCTION(BlueprintCallable)
+  void OnSkinSelected(const FString& SelectedSking);
 
-	UFUNCTION(BlueprintCallable)
-	void OnMapSelected(const FString& SelectedMap);
+  UFUNCTION(BlueprintCallable)
+  void OnMapSelected(const FString& SelectedMap);
 
-	UFUNCTION(BlueprintCallable)
-	void RequestStartGame(FName SelectedMap);
+  UFUNCTION(BlueprintCallable)
+  void RequestStartGame(FName SelectedMap);
 
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UScrollBox> PlayersListScrollBox;
+  UPROPERTY(meta = (BindWidget))
+  TObjectPtr<UScrollBox> PlayersListScrollBox;
 
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UComboBoxString> SkinSelector;
+  UPROPERTY(meta = (BindWidget))
+  TObjectPtr<UComboBoxString> SkinSelector;
 
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UComboBoxString> MapSelector;
+  UPROPERTY(meta = (BindWidget))
+  TObjectPtr<UComboBoxString> MapSelector;
 
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UButton> ReadyButton;
+  UPROPERTY(meta = (BindWidget))
+  TObjectPtr<UButton> ReadyButton;
 
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UButton> StartGameButton;
+  UPROPERTY(meta = (BindWidget))
+  TObjectPtr<UButton> StartGameButton;
 
-	void SetTankPreviewActor(ATankPreviewActor* PreviewActor);
+  void SetTankPreviewActor(ATankPreviewActor* PreviewActor);
 
 protected:
-	virtual void NativeConstruct() override;
+  virtual void NativeConstruct() override;
 
-	void RefreshScrollBox();
+  void RefreshScrollBox();
 
 private:
-	UPROPERTY()
-	TObjectPtr<ATankPreviewActor> TankPreview;
+  UPROPERTY()
+  TObjectPtr<ATankPreviewActor> TankPreview;
 
-	void UpdateTankPreviewSkin(int32 SkinIndex);
+  void UpdateTankPreviewSkin(int32 SkinIndex);
 };

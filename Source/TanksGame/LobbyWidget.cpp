@@ -25,16 +25,16 @@ void ULobbyWidget::SetReady(bool bIsReady)
 void ULobbyWidget::OnSkinSelected(const FString& SelectedSkin)
 {
   int32 SkinIndex = 0;
-  
+
   if (SelectedSkin == "Verde")
   {
     SkinIndex = 0;
   }
-  else if(SelectedSkin == "Camuflaje")
+  else if (SelectedSkin == "Camuflaje")
   {
     SkinIndex = 1;
-  } 
-  else if(SelectedSkin == "Arena")
+  }
+  else if (SelectedSkin == "Arena")
   {
     SkinIndex = 2;
   }
@@ -83,7 +83,7 @@ void ULobbyWidget::NativeConstruct()
 
   if (APlayerController* PC = GetOwningPlayer())
   {
-    if(!PC->HasAuthority())
+    if (!PC->HasAuthority())
     {
       if (MapSelector)
       {

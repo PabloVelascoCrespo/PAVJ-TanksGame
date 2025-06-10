@@ -12,6 +12,8 @@
 #include "Components/ProgressBar.h"
 #include "TankGameMode.h"
 #include "TankPlayerController.h"
+#include "Kismet/GameplayStatics.h"
+#include "Components/AudioComponent.h"
 
 ATank::ATank()
 {
@@ -26,6 +28,11 @@ ATank::ATank()
 
   TankCannon = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Tank Cannon"));
   TankCannon->SetupAttachment(TankTurret);
+
+  MuzzleFlashPoint = CreateDefaultSubobject<USceneComponent>(TEXT("Muzzle Flash Point"));
+  MuzzleFlashPoint->SetupAttachment(TankCannon);
+
+
 
   SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("Spring Arm"));
   SpringArm->SetupAttachment(TankBody);
@@ -154,6 +161,14 @@ void ATank::OnRep_CurrentHealth()
 
 void ATank::HandleDestruction()
 {
+
+  if (bAutoPilot)
+  {
+    return;
+  }
+
+  EngineSoundComponent->Stop();
+
   AController* TankController = GetController();
   DetachFromControllerPendingDestroy();
   Destroy();
@@ -171,6 +186,17 @@ void ATank::HandleDestruction()
 void ATank::BeginPlay()
 {
   Super::BeginPlay();
+
+  if (EngineSound)
+  {
+    EngineSoundComponent = UGameplayStatics::SpawnSound2D(this, EngineSound, 0.0f, 1.0f, 0.0f);
+  }
+
+  if (bAutoPilot)
+  {
+    AutoPilotStep = 0;
+    GetWorld()->GetTimerManager().SetTimer(AutoPilotTimerHandle, this, &ATank::AutoPilotTick, 2.0f, true);
+  }
 
   if (IsLocallyControlled())
   {
@@ -198,6 +224,13 @@ void ATank::EndPlay(const EEndPlayReason::Type EndPlayReason)
     CannonIndicatorWidget = nullptr;
   }
 
+  if (EngineSoundComponent)
+  {
+    EngineSoundComponent->Stop();
+    EngineSoundComponent->DestroyComponent();
+    EngineSoundComponent = nullptr;
+
+  }
 }
 
 void ATank::PossessedBy(AController* NewController)
@@ -206,6 +239,125 @@ void ATank::PossessedBy(AController* NewController)
   if (IsLocallyControlled())
   {
     InitializeLocalPlayerUI();
+  }
+}
+
+void ATank::Multicast_SpawnMuzzleEffect_Implementation()
+{
+  if (MuzzleFlash)
+  {
+    UGameplayStatics::SpawnEmitterAttached(MuzzleFlash, MuzzleFlashPoint, NAME_None, FVector::ZeroVector,
+      FRotator::ZeroRotator, FVector(1.0f), EAttachLocation::KeepRelativeOffset);
+  }
+}
+
+void ATank::AutoPilotTick()
+{
+  switch (AutoPilotStep)
+  {
+  case 0:
+    MoveInputValue = 0.0f;
+    MoveInputValueReplicated = 0.0f;
+    ExecuteFire();
+    break;
+  case 1:
+    MoveInputValue = 1.0f;
+    MoveInputValueReplicated = 1.0f;
+
+    break;
+  default:
+    MoveInputValue = 0.0f;
+    MoveInputValueReplicated = 0.0f;
+    ExecuteFire();
+    break;
+  }
+  UpdateEngineSound();
+  AutoPilotStep = (AutoPilotStep + 1) % 2;
+}
+
+void ATank::UpdateEngineSound()
+{
+  if (!EngineSoundComponent && EngineSound)
+  {
+    EngineSoundComponent = UGameplayStatics::SpawnSound2D(this, EngineSound, 0.0f, 1.0f, 0.0f);
+  }
+
+  if (!EngineSoundComponent)
+  {
+    return;
+  }
+
+  bool bIsMoving = FMath::Abs(MoveInputValue) > KINDA_SMALL_NUMBER || FMath::Abs(MoveInputValueReplicated) > KINDA_SMALL_NUMBER;
+
+  if (bIsMoving)
+  {
+    if (!EngineSoundComponent->IsPlaying())
+    {
+      EngineSoundComponent->Play();
+    }
+    if (IsLocallyControlled())
+    {
+      EngineSoundComponent->SetVolumeMultiplier(0.5f);
+    }
+    else
+    {
+      APlayerController* LocalPC = GEngine->GetFirstLocalPlayerController(GetWorld());
+      if (LocalPC && LocalPC->PlayerCameraManager)
+      {
+        FVector ListenerLocation = LocalPC->PlayerCameraManager->GetCameraLocation();
+
+        float Distance = FVector::Dist(ListenerLocation, GetActorLocation());
+        float Volume = FMath::GetMappedRangeValueClamped(FVector2D(0.0f, DistantSoundTriggerRange), FVector2D(0.5f, 0.1f), Distance);
+
+        EngineSoundComponent->SetVolumeMultiplier(Volume);
+      }
+    }
+  }
+  else
+  {
+    EngineSoundComponent->Stop();
+  }
+
+}
+
+void ATank::Multicast_PlayEngineSound_Implementation(bool bIsMoving)
+{
+  if (IsLocallyControlled())
+  {
+    return;
+  }
+
+  if (!EngineSoundComponent && EngineSound)
+  {
+    EngineSoundComponent = UGameplayStatics::SpawnSound2D(this, EngineSound, 0.0f, 1.0f, 0.0f);
+  }
+
+  if (!EngineSoundComponent)
+  {
+    return;
+  }
+
+  if (bIsMoving)
+  {
+    if (!EngineSoundComponent->IsPlaying())
+    {
+      EngineSoundComponent->Play();
+    }
+
+    APlayerController* LocalPC = GEngine->GetFirstLocalPlayerController(GetWorld());
+    if (LocalPC && LocalPC->PlayerCameraManager)
+    {
+      FVector ListenerLocation = LocalPC->PlayerCameraManager->GetCameraLocation();
+
+      float Distance = FVector::Dist(ListenerLocation, GetActorLocation());
+      float Volume = FMath::GetMappedRangeValueClamped(FVector2D(0.0f, DistantSoundTriggerRange), FVector2D(1.0f, 0.1f), Distance);
+
+      EngineSoundComponent->SetVolumeMultiplier(Volume);
+    }
+  }
+  else
+  {
+    EngineSoundComponent->Stop();
   }
 }
 
@@ -280,6 +432,15 @@ void ATank::ForwardMovement(float DeltaTime)
     FVector Forward = FVector::ForwardVector;
     AddActorLocalOffset(Forward * MoveSpeed * DeltaTime, true);
   }
+
+  if (IsLocallyControlled())
+  {
+    UpdateEngineSound();
+
+  }
+  bool bIsMoving = FMath::Abs(MoveInputValue) > KINDA_SMALL_NUMBER || FMath::Abs(MoveInputValueReplicated) > KINDA_SMALL_NUMBER;
+
+  Multicast_PlayEngineSound(bIsMoving);
 }
 
 void ATank::Turn(const FInputActionValue& Value)
@@ -350,6 +511,17 @@ void ATank::Server_Fire_Implementation()
   ExecuteFire();
 }
 
+bool ATank::Server_Fire_Validate()
+{
+  float CurrentTime = GetWorld()->GetTimeSeconds();
+  float TimeSiceLastFire = CurrentTime - LastFireTime;
+  if (TimeSiceLastFire < (FireRate * 0.9f))
+  {
+    return false;
+  }
+  return true;
+}
+
 void ATank::Client_PlayCameraShake_Implementation()
 {
   if (PC)
@@ -376,6 +548,16 @@ void ATank::ExecuteFire()
       SpawnParams.Instigator = GetInstigator();
 
       GetWorld()->SpawnActor<AProjectile>(ProjectileClass, SpawnLocation, SpawnRotation, SpawnParams);
+
+      Multicast_SpawnMuzzleEffect();
+
+      FVector SoundLocation = TankCannon->GetComponentLocation();
+
+      if (IsLocallyControlled())
+      {
+        PlaySoundAtLocation(CloseFireSounds, SoundLocation, 1.0f);
+      }
+      Multicast_PlayFireSound(SoundLocation);
     }
   }
 }
@@ -558,4 +740,46 @@ void ATank::UpdateHealthUI()
 void ATank::OnRep_SkinIndex()
 {
   ApplySkinByIndex(SkinIndex);
+}
+
+void ATank::PlaySoundAtLocation(const TArray<USoundBase*>& SoundArray, const FVector Location, const float Volume)
+{
+  if (SoundArray.Num() == 0)
+  {
+    return;
+  }
+
+  int32 Index = FMath::RandRange(0, SoundArray.Num() - 1);
+  USoundBase* SelectedSound = SoundArray[Index];
+
+  if (SelectedSound)
+  {
+    UGameplayStatics::PlaySound2D(this, SelectedSound, Volume);
+  }
+}
+
+void ATank::Multicast_PlayFireSound_Implementation(FVector Location)
+{
+  //APlayerController* LocalPC = GetWorld()->GetFirstPlayerController(); // CAMBIAR
+  APlayerController* LocalPC = GEngine->GetFirstLocalPlayerController(GetWorld());
+
+  if (!LocalPC || !LocalPC->PlayerCameraManager)
+  {
+    return;
+  }
+
+  FVector ListenerLocation = LocalPC->PlayerCameraManager->GetCameraLocation();
+  float Distance = FVector::Dist(ListenerLocation, Location);
+  float Volume = 1.0f;
+  const float MinVolume = 0.2f;
+
+  if (Distance < DistantSoundTriggerRange)
+  {
+    Volume = FMath::GetMappedRangeValueClamped(FVector2D(0.0f, DistantSoundTriggerRange), FVector2D(1.0f, MinVolume), Distance);
+    PlaySoundAtLocation(CloseFireSounds, Location, Volume);
+  }
+  else
+  {
+    PlaySoundAtLocation(DistantFireSounds, Location, Volume);
+  }
 }
